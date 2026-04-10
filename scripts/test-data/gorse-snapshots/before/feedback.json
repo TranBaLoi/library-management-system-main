@@ -1,0 +1,146 @@
+[
+  {
+    "feedbackType": "borrow",
+    "userId": "user_2",
+    "itemId": "book_726",
+    "timeStamp": "2026-04-02T00:21:59.000Z",
+    "comment": "",
+    "value": 5
+  },
+  {
+    "feedbackType": "borrow",
+    "userId": "user_3",
+    "itemId": "book_776",
+    "timeStamp": "2026-04-02T00:11:35.000Z",
+    "comment": "",
+    "value": 5
+  },
+  {
+    "feedbackType": "like",
+    "userId": "user_2",
+    "itemId": "book_764",
+    "timeStamp": "2026-04-06T02:52:32.000Z",
+    "comment": "",
+    "value": 0
+  },
+  {
+    "feedbackType": "like",
+    "userId": "user_2",
+    "itemId": "book_769",
+    "timeStamp": "2026-04-06T02:52:38.000Z",
+    "comment": "",
+    "value": 0
+  },
+  {
+    "feedbackType": "like",
+    "userId": "user_2",
+    "itemId": "book_773",
+    "timeStamp": "2026-04-06T02:52:27.000Z",
+    "comment": "",
+    "value": 0
+  },
+  {
+    "feedbackType": "like",
+    "userId": "user_2",
+    "itemId": "book_778",
+    "timeStamp": "2026-04-02T00:20:56.000Z",
+    "comment": "",
+    "value": 4
+  },
+  {
+    "feedbackType": "like",
+    "userId": "user_3",
+    "itemId": "book_776",
+    "timeStamp": "2026-04-02T00:15:27.000Z",
+    "comment": "",
+    "value": 4
+  },
+  {
+    "feedbackType": "like",
+    "userId": "user_3",
+    "itemId": "book_778",
+    "timeStamp": "2026-04-01T23:59:26.000Z",
+    "comment": "",
+    "value": 4
+  },
+  {
+    "feedbackType": "read",
+    "userId": "user_2",
+    "itemId": "book_100",
+    "timeStamp": "2026-04-06T02:50:13.000Z",
+    "comment": "",
+    "value": 0
+  },
+  {
+    "feedbackType": "read",
+    "userId": "user_2",
+    "itemId": "book_101",
+    "timeStamp": "2026-04-06T02:48:09.000Z",
+    "comment": "",
+    "value": 0
+  },
+  {
+    "feedbackType": "read",
+    "userId": "user_2",
+    "itemId": "book_104",
+    "timeStamp": "2026-04-06T02:48:11.000Z",
+    "comment": "",
+    "value": 0
+  },
+  {
+    "feedbackType": "read",
+    "userId": "user_2",
+    "itemId": "book_145",
+    "timeStamp": "2026-04-06T02:48:52.000Z",
+    "comment": "",
+    "value": 0
+  },
+  {
+    "feedbackType": "read",
+    "userId": "user_2",
+    "itemId": "book_15",
+    "timeStamp": "2026-04-06T02:48:03.000Z",
+    "comment": "",
+    "value": 0
+  },
+  {
+    "feedbackType": "read",
+    "userId": "user_2",
+    "itemId": "book_741",
+    "timeStamp": "2026-04-06T02:49:42.000Z",
+    "comment": "",
+    "value": 0
+  },
+  {
+    "feedbackType": "read",
+    "userId": "user_2",
+    "itemId": "book_764",
+    "timeStamp": "2026-04-06T02:52:31.000Z",
+    "comment": "",
+    "value": 0
+  },
+  {
+    "feedbackType": "read",
+    "userId": "user_2",
+    "itemId": "book_769",
+    "timeStamp": "2026-04-06T02:52:37.000Z",
+    "comment": "",
+    "value": 0
+  },
+  {
+    "feedbackType": "read",
+    "userId": "user_2",
+    "itemId": "book_773",
+    "timeStamp": "2026-04-06T02:48:18.000Z",
+    "comment": "",
+    "value": 0
+  },
+  {
+    "feedbackType": "read",
+    "userId": "user_2",
+    "itemId": "book_776",
+    "timeStamp": "2026-04-06T02:48:15.000Z",
+    "comment": "",
+    "value": 0
+  }
+]

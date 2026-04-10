@@ -1,0 +1,261 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: library-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - '${MYSQL_PORT}:3306'
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - library-network
+    command: --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test:
+        ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-u', 'root', '-p${MYSQL_ROOT_PASSWORD}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: library-redis
+    restart: unless-stopped
+    ports:
+      - '${REDIS_PORT}:6379'
+    volumes:
+      - redis_data:/data
+    networks:
+      - library-network
+    command: >
+      redis-server
+      --save 60 1
+      --loglevel warning
+      --requirepass ${REDIS_PASSWORD}
+
+  # MySQL for Gorse Recommender System (separate from web app MySQL)
+  mysql-gorse:
+    image: mysql:8.0
+    container_name: library-mysql-gorse
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${GORSE_MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${GORSE_MYSQL_DATABASE}
+      MYSQL_USER: ${GORSE_MYSQL_USER}
+      MYSQL_PASSWORD: ${GORSE_MYSQL_PASSWORD}
+    ports:
+      - '${GORSE_MYSQL_PORT}:3306'
+    volumes:
+      - mysql_gorse_data:/var/lib/mysql
+    networks:
+      - library-network
+    command: --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'mysqladmin',
+          'ping',
+          '-h',
+          'localhost',
+          '-u',
+          'root',
+          '-p${GORSE_MYSQL_ROOT_PASSWORD}',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Redis for Gorse Recommender System (separate from web app Redis)
+  # Note: Gorse requires Redis Stack (with RediSearch module) for full functionality
+  redis-gorse:
+    image: redis/redis-stack-server:latest
+    container_name: library-redis-gorse
+    restart: unless-stopped
+    ports:
+      - '${GORSE_REDIS_PORT}:6379'
+    volumes:
+      - redis_gorse_data:/data
+    networks:
+      - library-network
+    command: >
+      redis-stack-server
+      --save 60 1
+      --loglevel warning
+      --requirepass ${GORSE_REDIS_PASSWORD}
+
+  # Worker Service (Queue Worker)
+  worker:
+    image: node:20-alpine
+    container_name: library-worker
+    restart: unless-stopped
+    working_dir: /app
+    volumes:
+      - ./:/app
+    command: >
+      sh -c "npx prisma generate && \
+      yarn worker"
+    depends_on:
+      - redis
+    environment:
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    env_file:
+      - .env
+    networks:
+      - library-network
+
+  # Socket Server
+  socket-server:
+    image: node:20-alpine
+    container_name: library-socket-server
+    restart: unless-stopped
+    working_dir: /app
+    ports:
+      - '${SOCKET_PORT}:4000'
+    volumes:
+      - ./:/app
+    command: yarn dev:socket
+    environment:
+      - JWT_SECRET=${JWT_SECRET}
+    env_file:
+      - .env
+    networks:
+      - library-network
+
+  # Web Application (Next.js)
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Pass NEXT_PUBLIC_* variables as build args (required at build time)
+        - NEXT_PUBLIC_SOCKET_URL=${NEXT_PUBLIC_SOCKET_URL}
+        - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+        - NEXT_PUBLIC_PAYPAL_CLIENT_ID=${NEXT_PUBLIC_PAYPAL_CLIENT_ID}
+    container_name: library-web
+    restart: unless-stopped
+    ports:
+      - '${WEB_PORT}:${PORT}'
+    volumes:
+      - ./uploads:/app/uploads
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_DB=${REDIS_DB}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN}
+      - JWT_REFRESH_EXPIRES_IN=${JWT_REFRESH_EXPIRES_IN}
+      - PORT=${PORT}
+      - NODE_ENV=${NODE_ENV}
+      - NEXT_PUBLIC_SOCKET_URL=${NEXT_PUBLIC_SOCKET_URL}
+      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+      - NEXT_PUBLIC_PAYPAL_CLIENT_ID=${NEXT_PUBLIC_PAYPAL_CLIENT_ID}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL}
+      - QDRANT_URL=${QDRANT_URL}
+      - QDRANT_API_KEY=${QDRANT_API_KEY}
+      - OLLAMA_HOST=${OLLAMA_HOST}
+      - OLLAMA_EMBED_MODEL=${OLLAMA_EMBED_MODEL}
+      - OLLAMA_SUMMARY_MODEL=${OLLAMA_SUMMARY_MODEL}
+    env_file:
+      - .env
+    networks:
+      - library-network
+    healthcheck:
+      test: ['CMD', 'wget', '--quiet', '--tries=1', '--spider', 'http://localhost:${PORT}/']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Gorse Recommender System (All-in-one: Master + Worker + API + Dashboard)
+  gorse:
+    image: zhenghaoz/gorse-in-one:latest
+    container_name: library-gorse
+    restart: unless-stopped
+    ports:
+      - '${GORSE_API_PORT}:8087' # API server port
+      - '${GORSE_DASHBOARD_PORT}:8088' # Dashboard port
+    depends_on:
+      mysql-gorse:
+        condition: service_healthy
+      redis-gorse:
+        condition: service_started
+    environment:
+      # Database configuration - uses dedicated MySQL database for Gorse
+      - GORSE_DATA_STORE=mysql://${GORSE_MYSQL_USER}:${GORSE_MYSQL_PASSWORD}@tcp(mysql-gorse:3306)/${GORSE_MYSQL_DATABASE}?parseTime=true
+      # Redis configuration (separate from web app Redis)
+      - GORSE_CACHE_STORE=redis://:${GORSE_REDIS_PASSWORD}@redis-gorse:6379/0
+      - GORSE_SERVER_API_KEY=${GORSE_SERVER_API_KEY}
+    volumes:
+      - ./gorse-config.toml:/etc/gorse/config.toml:ro
+    networks:
+      - library-network
+    healthcheck:
+      test: ['CMD', 'wget', '--quiet', '--tries=1', '--spider', 'http://localhost:8087/api/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # qdrant:
+  #   image: qdrant/qdrant:latest
+  #   container_name: library_qdrant
+  #   restart: unless-stopped
+  #   ports:
+  #     - '6333:6333' # Port HTTP API
+  #     - '6334:6334' # Port gRPC
+  #   volumes:
+  #     - qdrant_data:/qdrant/storage
+  #   environment:
+  #     - QDRANT__SERVICE__API_KEY=${QDRANT_API_KEY}
+  #   networks:
+  #     - library-network
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    ports:
+      - '11434:11434'
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - library-network
+
+volumes:
+  mysql_data:
+    driver: local
+  mysql_gorse_data:
+    driver: local
+  redis_data:
+    driver: local
+  redis_gorse_data:
+    driver: local
+  qdrant_data:
+    driver: local
+  ollama_data:
+    driver: local
+
+networks:
+  library-network:
+    driver: bridge

@@ -1,0 +1,425 @@
+// ===================================
+// Prisma Schema for Library System
+// ===================================
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-arm64-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// =========================
+// USERS & NOTIFICATIONS
+// =========================
+model User {
+  id              Int        @id @default(autoincrement())
+  fullName        String
+  email           String     @unique
+  password        String
+  phoneNumber     String?
+  address         String?    @db.Text
+  avatarUrl       String?
+  role            Role
+  status          UserStatus
+  violationPoints Int        @default(0)
+  interest        String?    @db.Text // JSON array string, e.g., "[\"computer\",\"business\"]"
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  inactiveAt   DateTime?
+  firstLoginAt DateTime?
+  isDeleted    Boolean   @default(false)
+
+  notifications     Notification[]
+  reviews           Review[]
+  borrowRequests    BorrowRequest[]
+  borrowRecords     BorrowRecord[]
+  userFavoriteBooks UserFavoriteBook[]
+  refreshTokens     RefreshToken[]
+}
+
+model Notification {
+  id        Int                @id @default(autoincrement())
+  userId    Int
+  title     String
+  message   String
+  type      NotificationType
+  status    NotificationStatus
+  readAt    DateTime?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  isDeleted Boolean            @default(false)
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model RefreshToken {
+  id        String   @id
+  userId    Int
+  token     String   @db.Text
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model OTP {
+  id         Int       @id @default(autoincrement())
+  email      String
+  code       String
+  type       OTPType
+  expiresAt  DateTime
+  verified   Boolean   @default(false)
+  verifiedAt DateTime?
+  attempts   Int       @default(0)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+// =========================
+// AUTHORS & BOOKS
+// =========================
+model Author {
+  id          Int       @id @default(autoincrement())
+  fullName    String
+  bio         String?
+  birthDate   DateTime?
+  nationality String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  isDeleted   Boolean   @default(false)
+
+  books Book[]
+}
+
+model Book {
+  id            Int     @id @default(autoincrement())
+  authorId      Int
+  title         String  @db.Text
+  isbn          String? @unique
+  publishYear   Int?
+  publisher     String? @db.Text
+  pageCount     Int?
+  price         Float?
+  edition       String?
+  description   String? @db.Text
+  subtitle      String? @db.Text
+  coverImageUrl String?
+  language      String? // Example: "vi"
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isDeleted Boolean  @default(false)
+
+  author             Author              @relation(fields: [authorId], references: [id])
+  bookCategories     BookCategory[]
+  userFavorites      UserFavoriteBook[]
+  reviews            Review[]
+  bookItems          BookItem[]
+  borrowRequestItems BorrowRequestItem[]
+  bookEditions       BookEdition[]
+  borrowEbooks       BorrowEbook[]
+}
+
+// =========================
+// CATEGORIES
+// =========================
+model Category {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  isDeleted   Boolean  @default(false)
+
+  bookCategories BookCategory[]
+}
+
+model BookCategory {
+  bookId     Int
+  categoryId Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  isDeleted  Boolean  @default(false)
+
+  book     Book     @relation(fields: [bookId], references: [id])
+  category Category @relation(fields: [categoryId], references: [id])
+
+  @@id([bookId, categoryId])
+}
+
+// =========================
+// FAVORITES, REVIEWS, LOGS, RECS
+// =========================
+model UserFavoriteBook {
+  userId    Int
+  bookId    Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isDeleted Boolean  @default(false)
+
+  user User @relation(fields: [userId], references: [id])
+  book Book @relation(fields: [bookId], references: [id])
+
+  @@unique([userId, bookId])
+}
+
+model Review {
+  id         Int       @id @default(autoincrement())
+  userId     Int
+  bookId     Int
+  rating     Int
+  reviewText String?
+  reviewDate DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  isDeleted  Boolean   @default(false)
+
+  user User @relation(fields: [userId], references: [id])
+  book Book @relation(fields: [bookId], references: [id])
+}
+
+// =========================
+// PHYSICAL ITEMS & BORROWING
+// =========================
+model BookItem {
+  id              Int        @id @default(autoincrement())
+  bookId          Int
+  code            String     @unique
+  condition       Condition
+  status          ItemStatus
+  acquisitionDate DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isDeleted Boolean  @default(false)
+
+  book        Book         @relation(fields: [bookId], references: [id])
+  borrowBooks BorrowBook[]
+}
+
+model BorrowRequest {
+  id        Int                 @id @default(autoincrement())
+  userId    Int
+  startDate DateTime
+  endDate   DateTime
+  status    BorrowRequestStatus @default(PENDING)
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+  isDeleted Boolean             @default(false)
+
+  user  User                @relation(fields: [userId], references: [id])
+  items BorrowRequestItem[]
+}
+
+model BorrowRequestItem {
+  borrowRequestId Int
+  bookId          Int
+  quantity        Int
+  startDate       DateTime
+  endDate         DateTime
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  isDeleted       Boolean  @default(false)
+
+  borrowRequest BorrowRequest @relation(fields: [borrowRequestId], references: [id])
+  book          Book          @relation(fields: [bookId], references: [id])
+
+  @@id([borrowRequestId, bookId])
+}
+
+model BorrowRecord {
+  id               Int          @id @default(autoincrement())
+  userId           Int
+  borrowDate       DateTime
+  returnDate       DateTime?
+  actualReturnDate DateTime?
+  renewalCount     Int          @default(0)
+  status           BorrowStatus
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  isDeleted        Boolean      @default(false)
+
+  user         User          @relation(fields: [userId], references: [id])
+  borrowBooks  BorrowBook[]
+  payments     Payment[]
+  borrowEbooks BorrowEbook[]
+}
+
+model BorrowBook {
+  borrowId   Int
+  bookItemId Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  isDeleted  Boolean  @default(false)
+
+  borrow   BorrowRecord @relation(fields: [borrowId], references: [id])
+  bookItem BookItem     @relation(fields: [bookItemId], references: [id])
+
+  @@id([borrowId, bookItemId])
+}
+
+// =========================
+// POLICIES & PAYMENTS
+// =========================
+model Policy {
+  id        String   @id
+  name      String
+  amount    Int
+  unit      Unit
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isDeleted Boolean  @default(false)
+
+  payments Payment[]
+}
+
+model Payment {
+  id             Int       @id @default(autoincrement())
+  policyId       String
+  borrowRecordId Int
+  amount         Int
+  isPaid         Boolean   @default(false)
+  paidAt         DateTime?
+  dueDate        DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  isDeleted      Boolean   @default(false)
+
+  policy       Policy       @relation(fields: [policyId], references: [id])
+  borrowRecord BorrowRecord @relation(fields: [borrowRecordId], references: [id])
+}
+
+// =========================
+// DIGITAL PROVIDERS / EBOOKS
+// =========================
+model BookEdition {
+  id             Int           @id @default(autoincrement())
+  bookId         Int
+  format         EditionFormat
+  isbn13         String?
+  fileFormat     FileFormat    @default(OTHER)
+  fileSizeBytes  BigInt?
+  checksumSha256 String?
+  storageUrl     String
+  drmType        DRMType       @default(NONE)
+  status         String?       @default("ACTIVE")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isDeleted Boolean  @default(false)
+
+  book Book @relation(fields: [bookId], references: [id])
+
+  @@unique([bookId, format, isbn13])
+}
+
+model BorrowEbook {
+  borrowId  Int
+  bookId    Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isDeleted Boolean  @default(false)
+
+  borrow BorrowRecord @relation(fields: [borrowId], references: [id])
+  book   Book         @relation(fields: [bookId], references: [id])
+
+  @@id([borrowId, bookId])
+}
+
+// =========================
+// ENUMS
+// =========================
+enum Role {
+  ADMIN
+  LIBRARIAN
+  READER
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum NotificationType {
+  SYSTEM
+  REMINDER
+  ALERT
+  OTHER
+}
+
+enum NotificationStatus {
+  UNREAD
+  READ
+}
+
+enum Condition {
+  NEW
+  GOOD
+  WORN
+  DAMAGED
+  LOST
+}
+
+enum ItemStatus {
+  AVAILABLE
+  ON_BORROW
+  RESERVED
+  MAINTENANCE
+  RETIRED
+  LOST
+}
+
+enum BorrowRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  EXPIRED
+  FULFILLED
+}
+
+enum BorrowStatus {
+  BORROWED
+  RETURNED
+  OVERDUE
+}
+
+enum Unit {
+  FIXED
+  PER_DAY
+}
+
+enum EditionFormat {
+  EBOOK
+  AUDIO
+}
+
+enum FileFormat {
+  EPUB
+  PDF
+  MOBI
+  AUDIO_MP3
+  AUDIO_M4B
+  OTHER
+}
+
+enum DRMType {
+  NONE
+  WATERMARK
+  ADOBE_DRM
+  LCP
+  CUSTOM
+}
+
+enum OTPType {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+  LOGIN_2FA
+  PHONE_VERIFICATION
+}

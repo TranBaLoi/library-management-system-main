@@ -1,0 +1,263 @@
+# Gorse Recommender System Configuration
+# This file is optional - Gorse can run with environment variables alone
+# Uncomment the volume mount in docker-compose.yml to use this config file
+
+[database]
+# Database connection is configured via GORSE_DATA_STORE environment variable
+# Format: mysql://user:password@tcp(host:port)/database?parseTime=true
+
+[cache]
+# Cache connection is configured via GORSE_CACHE_STORE environment variable
+# Format: redis://:password@host:port/db
+
+[master]
+# gRPC port of the master node. The default value is 8086.
+port = 8086
+
+# gRPC host of the master node. The default values is "0.0.0.0".
+host = "0.0.0.0"
+
+# HTTP port of the master node (used for API and Dashboard). The default values is 8088.
+http_port = 8088
+
+# HTTP host of the master node. The default values is "0.0.0.0".
+http_host = "0.0.0.0"
+
+# Number of working jobs in the master node. The default value is 1.
+n_jobs = 1
+
+[server]
+# Default number of returned items. The default value is 10.
+default_n = 10
+
+# Secret key for RESTful APIs (SSL required).
+api_key = ""
+
+# Clock error in the cluster. The default value is 5s.
+clock_error = "5s"
+
+# Insert new users while inserting feedback. The default value is true.
+auto_insert_user = true
+
+# Insert new items while inserting feedback. The default value is true.
+auto_insert_item = true
+
+# Server-side cache expire time. The default value is 10s.
+cache_expire = "10s"
+
+[recommend]
+# The cache size for recommended/popular/latest items. The default value is 10.
+cache_size = 100
+
+# Recommended cache expire time. The default value is 72h.
+cache_expire = "72h"
+
+# The context size for online recommendations. Online recommendations can't use all user feedbacks to generate
+# recommendations for efficiency consideration. Instead, only the latest `context_size` feedbacks are used.
+# The default value is 100.
+context_size = 100
+
+# The time-to-live (days) of active users, 0 means disabled. Recommendation won't be cached for inactive users. The default value is 0.
+active_user_ttl = 0
+
+[recommend.data_source]
+# The feedback types for POSITIVE events (user LIKES the item)
+# All explicit positive actions
+positive_feedback_types = ["borrow", "star", "like"]
+
+# The feedback types for READ events (user has SEEN the item)
+read_feedback_types = ["read"]
+
+# The time-to-live (days) of positive feedback, 0 means disabled. The default value is 0.
+positive_feedback_ttl = 0
+
+# The time-to-live (days) of items, 0 means disabled. The default value is 0.
+item_ttl = 0
+
+[[recommend.non-personalized]]
+# The name of the leaderboard.
+name = "most_starred"
+
+# The score function for items in the leaderboard.
+score = "count(feedback, .FeedbackType == 'star')"
+
+# The filter for items in the leaderboard.
+filter = "(now() - item.Timestamp).Hours() < 16800"
+
+[[recommend.item-to-item]]
+# The name of the item-to-item recommender.
+name = "neighbors"
+
+# The type of the item-to-item recommender. There are three types:
+#   embedding: recommend by Euclidean distance of embeddings.
+#   tags: recommend by number of common tags.
+#   users: recommend by number of common users.
+#   chat: recommend by chat completion model.
+type = "users"
+
+# The column of the item embeddings. Leave blank if type is "users".
+# column = "item.Labels.embedding"
+
+[[recommend.user-to-user]]
+
+# The name of the user-to-user recommender.
+name = "neighbors"
+
+# The type of the user-to-user recommender. There are three types:
+#   embedding: recommend by Euclidean distance of embeddings.
+#   tags: recommend by number of common tags.
+#   items: recommend by number of common items.
+type = "items"
+
+[[recommend.external]]
+
+# The name of the external recommender.
+name = "trending"
+
+# The script to fetch external recommended items. The script should return a list of item IDs.
+script = """
+const response = fetch("https://cdn.jsdelivr.net/gh/isboyjc/github-trending-api/data/daily/all.json");
+if (!response.ok) {
+  throw new Error(`${response.status} ${response.body}`);
+}
+const data = JSON.parse(response.body);
+data["items"].map((item) => {
+  return item["title"].toLowerCase().replace("/", ":");
+})
+"""
+
+[recommend.collaborative]
+
+# The time period for model fitting. The default value is "60m".
+fit_period = "60m"
+
+# The number of epochs for model fitting. The default value is 100.
+fit_epoch = 100
+
+# The time period for hyperparameter optimization. The default value is "360m".
+optimize_period = "360m"
+
+# The number of trials for hyperparameter optimization. The default value is 10.
+optimize_trials = 10
+
+[recommend.collaborative.early_stopping]
+
+# Number of epochs to wait if no improvement and then stop the training. The default value is 10.
+patience = 10
+
+[recommend.replacement]
+
+# Replace historical items back to recommendations. The default value is false.
+enable_replacement = false
+
+# Decay the weights of replaced items from positive feedbacks. The default value is 0.8.
+positive_replacement_decay = 0.8
+
+# Decay the weights of replaced items from read feedbacks. The default value is 0.6.
+read_replacement_decay = 0.6
+
+[recommend.ranker]
+
+# The type of the ranker. There are two types:
+#   none: no ranking.
+#   fm: factorization machines.
+type = "fm"
+
+# The time period to refresh recommendation for inactive users. The default values is 120h.
+cache_expire = "120h"
+
+# The recommenders used to fetch candidate items before ranking. The default values is all recommenders.
+recommenders = ["latest", "non-personalized/most_starred", "item-to-item/neighbors", "user-to-user/neighbors"]
+
+# The time period for model fitting. The default value is "60m".
+fit_period = "60m"
+
+# The number of epochs for model fitting. The default value is 100.
+fit_epoch = 100
+
+# The time period for hyperparameter optimization. The default value is "360m".
+optimize_period = "360m"
+
+# The number of trials for hyperparameter optimization. The default value is 10.
+optimize_trials = 10
+
+[recommend.ranker.early_stopping]
+
+# Number of epochs to wait if no improvement and then stop the training. The default value is 10.
+patience = 10
+
+[recommend.fallback]
+
+# The fallback recommenders are used when cached recommendation drained out. The default values is ["latest"].
+recommenders = ["item-to-item/neighbors", "latest"]
+
+[tracing]
+
+# Enable tracing for REST APIs. The default value is false.
+enable_tracing = false
+# The type of tracing exporters should be one of "zipkin", "otlp", or "otlphttp".
+# Set to a supported exporter to avoid validation errors. When tracing is disabled
+# (`enable_tracing = false`) the exporter value is still validated, so use a
+# valid default here.
+exporter = "otlphttp"
+
+# The endpoint of tracing collector.
+collector_endpoint = "http://localhost:14268/api/traces"
+
+# The type of tracing sampler should be one of "always", "never" and "ratio". The default value is "always".
+sampler = "always"
+
+# The ratio of ratio based sampler. The default value is 1.
+ratio = 1
+
+[oidc]
+
+# Enable OpenID Connect (OIDC) authentication. The default value is false.
+enable = false
+
+# The issuer of the OAuth provider.
+issuer = ""
+
+# Public identifier of the OAuth application.
+client_id = ""
+
+# Token access to the OAuth application.
+client_secret = ""
+
+# URL used by the OAuth provider to redirect users after they are successfully authenticated
+# (also referred to as the callback URL). You should set this to the concatenation of the 
+# Gorse dashboard URL and "/callback/oauth2". For example, if the Gorse dashboard URL is 
+# http://localhost:8088, the redirect URL should be: http://localhost:8088/callback/oauth2
+redirect_url = ""
+
+[openai]
+
+# Base URL of OpenAI API.
+base_url = "http://localhost:11434/v1"
+
+# API key of OpenAI API.
+auth_token = "ollama"
+
+# Name of chat completion model.
+chat_completion_model = "qwen2.5"
+
+# Maximum requests per minute for chat completion.
+chat_completion_rpm = 15000
+
+# Maximum tokens per minute for chat completion.
+chat_completion_tpm = 1200000
+
+# Name of embedding model.
+embedding_model = "mxbai-embed-large"
+
+# Dimensions of embedding vectors.
+embedding_dimensions = 1024
+
+# Maximum requests per minute for embedding.
+embedding_rpm = 1800
+
+# Maximum tokens per minute for embedding.
+embedding_tpm = 1200000
+
+# Log file for OpenAI API.
+log_file = "openai.log"

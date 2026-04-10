@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE `Book` ADD COLUMN `language` VARCHAR(191) NULL,
+    ADD COLUMN `topic` VARCHAR(191) NULL;

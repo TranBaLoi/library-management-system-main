@@ -1,4 +1,4 @@
-﻿/**
+/**
  * FILE: tests/api/categories.api.test.ts
  * Mục tiêu: Unit test cho chức năng Quản lý Danh mục (Category)
  */
@@ -60,6 +60,16 @@ function createCategoryMockDb() {
 
 function cloneCategoryDb(db: { categories: CategoryRow[] }) {
   return { categories: db.categories.map(c => ({ ...c })) };
+}
+
+function rollbackCategoryDb(db: { categories: CategoryRow[] }, before: { categories: CategoryRow[] }) {
+  db.categories = before.categories.map(category => ({ ...category }));
+}
+
+function expectCategoryRollbackMatchesBefore(label: string, db: { categories: CategoryRow[] }, before: { categories: CategoryRow[] }) {
+  rollbackCategoryDb(db, before);
+  printCategoryDb(`${label} | DB AFTER ROLLBACK`, db);
+  expect(db).toEqual(before);
 }
 
 function printCategoryDb(label: string, db: { categories: CategoryRow[] }, extra: unknown = null) {
@@ -134,396 +144,222 @@ function wireCategoryPrismaToDb(db: { categories: CategoryRow[] }) {
 describe('TC_CATEGORY | Quản lý danh mục', () => {
   beforeEach(() => { jest.clearAllMocks(); });
 
-  // Giải thích từng dòng: Test case bên dưới được chú thích chi tiết theo từng bước Arrange - Act - Assert.
-  // Giải thích: Khai báo test case, Test Case ID phải khớp với ID trong file Excel.
   it('TC_CATEGORY_LIST_01: Lấy danh sách danh mục có phân trang', async () => {
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const db = createCategoryMockDb();
-    // Giải thích: Dòng này là một bước setup, action hoặc assert phục vụ testcase hiện tại.
     wireCategoryPrismaToDb(db);
-    // Giải thích: In DB BEFORE ra console để thấy dữ liệu trước khi chạy action.
     printCategoryDb('TC_CATEGORY_LIST_01 | DB BEFORE', db);
 
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const response = await getCategories(makeRequest('http://localhost/api/categories?page=1&limit=10') as any);
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const output = await response.json();
 
-    // Giải thích: In DB AFTER ra console để thấy dữ liệu sau khi chạy action.
     printCategoryDb('TC_CATEGORY_LIST_01 | DB AFTER', db, output);
 
-    // Giải thích: Assert kết quả thực tế khớp với expected output hoặc trạng thái DB mong muốn.
     expect(output.success).toBe(true);
-    // Giải thích: Assert kết quả thực tế khớp với expected output hoặc trạng thái DB mong muốn.
     expect(output.data.categories).toHaveLength(1);
-    // Giải thích: Assert kết quả thực tế khớp với expected output hoặc trạng thái DB mong muốn.
     expect(prisma.category.findMany).toHaveBeenCalledWith(expect.objectContaining({ skip: 0, take: 10 }));
-  // Giải thích: Đóng block code hiện tại sau khi hoàn tất các bước test.
   });
 
-  // Giải thích từng dòng: Test case bên dưới được chú thích chi tiết theo từng bước Arrange - Act - Assert.
-  // Giải thích: Khai báo test case, Test Case ID phải khớp với ID trong file Excel.
   it('TC_CATEGORY_LIST_02: Tìm kiếm danh mục theo keyword', async () => {
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const db = createCategoryMockDb();
-    // Giải thích: Thêm bản ghi vào DB giả lập để mô phỏng INSERT hoặc seed dữ liệu.
     db.categories.push(createCategoryRow({ id: 2, name: 'Horror' }));
-    // Giải thích: Dòng này là một bước setup, action hoặc assert phục vụ testcase hiện tại.
     wireCategoryPrismaToDb(db);
-    // Giải thích: In DB BEFORE ra console để thấy dữ liệu trước khi chạy action.
     printCategoryDb('TC_CATEGORY_LIST_02 | DB BEFORE', db);
 
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const response = await getCategories(makeRequest('http://localhost/api/categories?search=horror') as any);
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const output = await response.json();
 
-    // Giải thích: In DB AFTER ra console để thấy dữ liệu sau khi chạy action.
     printCategoryDb('TC_CATEGORY_LIST_02 | DB AFTER', db, output);
 
-    // Giải thích: Assert kết quả thực tế khớp với expected output hoặc trạng thái DB mong muốn.
     expect(output.data.categories).toHaveLength(1);
-    // Giải thích: Assert kết quả thực tế khớp với expected output hoặc trạng thái DB mong muốn.
     expect(output.data.categories[0].name).toBe('Horror');
-  // Giải thích: Đóng block code hiện tại sau khi hoàn tất các bước test.
   });
 
-  // Giải thích từng dòng: Test case bên dưới được chú thích chi tiết theo từng bước Arrange - Act - Assert.
-  // Giải thích: Khai báo test case, Test Case ID phải khớp với ID trong file Excel.
   it('TC_CATEGORY_ALL_01: Lấy tất cả danh mục chưa bị xóa', async () => {
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const db = createCategoryMockDb();
-    // Giải thích: Thêm bản ghi vào DB giả lập để mô phỏng INSERT hoặc seed dữ liệu.
     db.categories.push(createCategoryRow({ id: 2, name: 'Deleted Cat', isDeleted: true }));
-    // Giải thích: Dòng này là một bước setup, action hoặc assert phục vụ testcase hiện tại.
     wireCategoryPrismaToDb(db);
-    // Giải thích: In DB BEFORE ra console để thấy dữ liệu trước khi chạy action.
     printCategoryDb('TC_CATEGORY_ALL_01 | DB BEFORE', db);
 
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const response = await getAllCategories();
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const output = await response.json();
 
-    // Giải thích: In DB AFTER ra console để thấy dữ liệu sau khi chạy action.
     printCategoryDb('TC_CATEGORY_ALL_01 | DB AFTER', db, output);
 
-    // Giải thích: Assert kết quả thực tế khớp với expected output hoặc trạng thái DB mong muốn.
     expect(output.success).toBe(true);
-    // Giải thích: Assert kết quả thực tế khớp với expected output hoặc trạng thái DB mong muốn.
     expect(output.data).toHaveLength(1);
-    // Giải thích: Assert kết quả thực tế khớp với expected output hoặc trạng thái DB mong muốn.
     expect(output.data[0].isDeleted).toBe(false);
-  // Giải thích: Đóng block code hiện tại sau khi hoàn tất các bước test.
   });
 
-  // Giải thích từng dòng: Test case bên dưới được chú thích chi tiết theo từng bước Arrange - Act - Assert.
-  // Giải thích: Khai báo test case, Test Case ID phải khớp với ID trong file Excel.
   it('TC_CATEGORY_GET_01: Lấy chi tiết danh mục theo ID', async () => {
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const db = createCategoryMockDb();
-    // Giải thích: Dòng này là một bước setup, action hoặc assert phục vụ testcase hiện tại.
     wireCategoryPrismaToDb(db);
-    // Giải thích: In DB BEFORE ra console để thấy dữ liệu trước khi chạy action.
     printCategoryDb('TC_CATEGORY_GET_01 | DB BEFORE', db);
 
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const response = await getCategoryById(makeRequest('http://localhost/api/categories/1') as any, params('1'));
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const output = await response.json();
 
-    // Giải thích: In DB AFTER ra console để thấy dữ liệu sau khi chạy action.
     printCategoryDb('TC_CATEGORY_GET_01 | DB AFTER', db, output);
 
-    // Giải thích: Assert kết quả thực tế khớp với expected output hoặc trạng thái DB mong muốn.
     expect(output.success).toBe(true);
-    // Giải thích: Assert kết quả thực tế khớp với expected output hoặc trạng thái DB mong muốn.
     expect(output.data.id).toBe(1);
-  // Giải thích: Đóng block code hiện tại sau khi hoàn tất các bước test.
   });
 
-  // Giải thích từng dòng: Test case bên dưới được chú thích chi tiết theo từng bước Arrange - Act - Assert.
-  // Giải thích: Khai báo test case, Test Case ID phải khớp với ID trong file Excel.
   it('TC_CATEGORY_POST_01: Tạo danh mục mới thì DB phải thêm 1 dòng', async () => {
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const db = createCategoryMockDb();
-    // Giải thích: Dòng này là một bước setup, action hoặc assert phục vụ testcase hiện tại.
     wireCategoryPrismaToDb(db);
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const before = cloneCategoryDb(db);
-    // Giải thích: In DB BEFORE ra console để thấy dữ liệu trước khi chạy action.
     printCategoryDb('TC_CATEGORY_POST_01 | DB BEFORE', before);
 
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const response = await createCategory(makeRequest('http://localhost/api/categories', {
-      // Giải thích: Dòng này là một bước setup, action hoặc assert phục vụ testcase hiện tại.
       name: '  Comedy  ',
-      // Giải thích: Dòng này là một bước setup, action hoặc assert phục vụ testcase hiện tại.
       description: 'Funny books',
-    // Giải thích: Đóng block code hiện tại sau khi hoàn tất các bước test.
     }) as any);
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const output = await response.json();
 
-    // Giải thích: In DB AFTER ra console để thấy dữ liệu sau khi chạy action.
     printCategoryDb('TC_CATEGORY_POST_01 | DB AFTER', db, output);
 
-    // Giải thích: Assert kết quả thực tế khớp với expected output hoặc trạng thái DB mong muốn.
     expect(response.status).toBe(201);
-    // Giải thích: Assert kết quả thực tế khớp với expected output hoặc trạng thái DB mong muốn.
     expect(db.categories).toHaveLength(before.categories.length + 1);
-    // Giải thích: Assert kết quả thực tế khớp với expected output hoặc trạng thái DB mong muốn.
     expect(db.categories[1]).toMatchObject({ name: 'Comedy', description: 'Funny books', isDeleted: false });
-  // Giải thích: Đóng block code hiện tại sau khi hoàn tất các bước test.
+    expectCategoryRollbackMatchesBefore('TC_CATEGORY_POST_01', db, before);
   });
 
-  // Giải thích từng dòng: Test case bên dưới được chú thích chi tiết theo từng bước Arrange - Act - Assert.
-  // Giải thích: Khai báo test case, Test Case ID phải khớp với ID trong file Excel.
   it('TC_CATEGORY_POST_02: Thiếu name thì DB không thêm dòng', async () => {
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const db = createCategoryMockDb();
-    // Giải thích: Dòng này là một bước setup, action hoặc assert phục vụ testcase hiện tại.
     wireCategoryPrismaToDb(db);
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const before = cloneCategoryDb(db);
-    // Giải thích: In DB BEFORE ra console để thấy dữ liệu trước khi chạy action.
     printCategoryDb('TC_CATEGORY_POST_02 | DB BEFORE', db);
 
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const response = await createCategory(makeRequest('http://localhost/api/categories', { description: 'Missing name' }) as any);
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const output = await response.json();
 
-    // Giải thích: In DB AFTER ra console để thấy dữ liệu sau khi chạy action.
     printCategoryDb('TC_CATEGORY_POST_02 | DB AFTER', db, output);
 
-    // Giải thích: Assert kết quả thực tế khớp với expected output hoặc trạng thái DB mong muốn.
     expect(response.status).toBe(400);
-    // Giải thích: Assert kết quả thực tế khớp với expected output hoặc trạng thái DB mong muốn.
     expect(db.categories).toHaveLength(before.categories.length);
-  // Giải thích: Đóng block code hiện tại sau khi hoàn tất các bước test.
   });
 
-  // Giải thích từng dòng: Test case bên dưới được chú thích chi tiết theo từng bước Arrange - Act - Assert.
-  // Giải thích: Khai báo test case, Test Case ID phải khớp với ID trong file Excel.
   it('TC_CATEGORY_PUT_01: Cập nhật danh mục thì DB phải đổi thông tin', async () => {
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const db = createCategoryMockDb();
-    // Giải thích: Dòng này là một bước setup, action hoặc assert phục vụ testcase hiện tại.
     wireCategoryPrismaToDb(db);
-    // Giải thích: In DB BEFORE ra console để thấy dữ liệu trước khi chạy action.
+    const before = cloneCategoryDb(db);
     printCategoryDb('TC_CATEGORY_PUT_01 | DB BEFORE', db);
 
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const response = await updateCategory(makeRequest('http://localhost/api/categories/1', {
-      // Giải thích: Dòng này là một bước setup, action hoặc assert phục vụ testcase hiện tại.
       name: '  Updated Sci-Fi  ',
-    // Giải thích: Đóng block code hiện tại sau khi hoàn tất các bước test.
     }) as any, params('1'));
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const output = await response.json();
 
-    // Giải thích: In DB AFTER ra console để thấy dữ liệu sau khi chạy action.
     printCategoryDb('TC_CATEGORY_PUT_01 | DB AFTER', db, output);
 
-    // Giải thích: Assert kết quả thực tế khớp với expected output hoặc trạng thái DB mong muốn.
     expect(output.success).toBe(true);
-    // Giải thích: Assert kết quả thực tế khớp với expected output hoặc trạng thái DB mong muốn.
     expect(db.categories[0].name).toBe('Updated Sci-Fi');
-  // Giải thích: Đóng block code hiện tại sau khi hoàn tất các bước test.
+    expectCategoryRollbackMatchesBefore('TC_CATEGORY_PUT_01', db, before);
   });
 
-  // Giải thích từng dòng: Test case bên dưới được chú thích chi tiết theo từng bước Arrange - Act - Assert.
-  // Giải thích: Khai báo test case, Test Case ID phải khớp với ID trong file Excel.
   it('TC_CATEGORY_DELETE_01: Xóa danh mục thì DB phải soft delete', async () => {
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const db = createCategoryMockDb();
-    // Giải thích: Dòng này là một bước setup, action hoặc assert phục vụ testcase hiện tại.
     wireCategoryPrismaToDb(db);
-    // Giải thích: In DB BEFORE ra console để thấy dữ liệu trước khi chạy action.
+    const before = cloneCategoryDb(db);
     printCategoryDb('TC_CATEGORY_DELETE_01 | DB BEFORE', db);
 
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const response = await deleteCategory(makeRequest('http://localhost/api/categories/1') as any, params('1'));
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const output = await response.json();
 
-    // Giải thích: In DB AFTER ra console để thấy dữ liệu sau khi chạy action.
     printCategoryDb('TC_CATEGORY_DELETE_01 | DB AFTER', db, output);
 
-    // Giải thích: Assert kết quả thực tế khớp với expected output hoặc trạng thái DB mong muốn.
     expect(output.success).toBe(true);
-    // Giải thích: Assert kết quả thực tế khớp với expected output hoặc trạng thái DB mong muốn.
     expect(db.categories[0].isDeleted).toBe(true);
-  // Giải thích: Đóng block code hiện tại sau khi hoàn tất các bước test.
+    expectCategoryRollbackMatchesBefore('TC_CATEGORY_DELETE_01', db, before);
   });
 
 
-  // Giải thích từng dòng: Test case bên dưới được chú thích chi tiết theo từng bước Arrange - Act - Assert.
-  // Giải thích: Khai báo test case, Test Case ID phải khớp với ID trong file Excel.
   it('TC_CATEGORY_LIST_03: Sap xep danh muc', async () => {
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const db = createCategoryMockDb();
-    // Giải thích: Dòng này là một bước setup, action hoặc assert phục vụ testcase hiện tại.
     wireCategoryPrismaToDb(db);
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const response = await getCategories(makeRequest('http://localhost/api/categories?sortBy=name&sortOrder=desc') as any);
-    // Giải thích: Assert kết quả thực tế khớp với expected output hoặc trạng thái DB mong muốn.
     expect(response.status).toBe(200);
-  // Giải thích: Đóng block code hiện tại sau khi hoàn tất các bước test.
   });
 
-  // Giải thích từng dòng: Test case bên dưới được chú thích chi tiết theo từng bước Arrange - Act - Assert.
-  // Giải thích: Khai báo test case, Test Case ID phải khớp với ID trong file Excel.
   it('TC_CATEGORY_GET_02: ID khong hop le', async () => {
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const response = await getCategoryById(makeRequest('http://localhost/api/categories/invalid') as any, params('invalid'));
-    // Giải thích: Assert kết quả thực tế khớp với expected output hoặc trạng thái DB mong muốn.
     expect(response.status).toBe(400);
-  // Giải thích: Đóng block code hiện tại sau khi hoàn tất các bước test.
   });
 
-  // Giải thích từng dòng: Test case bên dưới được chú thích chi tiết theo từng bước Arrange - Act - Assert.
-  // Giải thích: Khai báo test case, Test Case ID phải khớp với ID trong file Excel.
   it('TC_CATEGORY_GET_03: Danh muc khong ton tai', async () => {
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const db = createCategoryMockDb();
-    // Giải thích: Dòng này là một bước setup, action hoặc assert phục vụ testcase hiện tại.
     wireCategoryPrismaToDb(db);
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const response = await getCategoryById(makeRequest('http://localhost/api/categories/99') as any, params('99'));
-    // Giải thích: Assert kết quả thực tế khớp với expected output hoặc trạng thái DB mong muốn.
     expect(response.status).toBe(404);
-  // Giải thích: Đóng block code hiện tại sau khi hoàn tất các bước test.
   });
 
-  // Giải thích từng dòng: Test case bên dưới được chú thích chi tiết theo từng bước Arrange - Act - Assert.
-  // Giải thích: Khai báo test case, Test Case ID phải khớp với ID trong file Excel.
   it('TC_CATEGORY_PUT_02: Cap nhat ID khong hop le', async () => {
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const response = await updateCategory(makeRequest('http://localhost/api/categories/invalid', {}) as any, params('invalid'));
-    // Giải thích: Assert kết quả thực tế khớp với expected output hoặc trạng thái DB mong muốn.
     expect(response.status).toBe(400);
-  // Giải thích: Đóng block code hiện tại sau khi hoàn tất các bước test.
   });
 
-  // Giải thích từng dòng: Test case bên dưới được chú thích chi tiết theo từng bước Arrange - Act - Assert.
-  // Giải thích: Khai báo test case, Test Case ID phải khớp với ID trong file Excel.
   it('TC_CATEGORY_PUT_03: Cap nhat Danh muc khong ton tai', async () => {
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const db = createCategoryMockDb();
-    // Giải thích: Dòng này là một bước setup, action hoặc assert phục vụ testcase hiện tại.
     wireCategoryPrismaToDb(db);
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const response = await updateCategory(makeRequest('http://localhost/api/categories/99', {}) as any, params('99'));
-    // Giải thích: Assert kết quả thực tế khớp với expected output hoặc trạng thái DB mong muốn.
     expect(response.status).toBe(404);
-  // Giải thích: Đóng block code hiện tại sau khi hoàn tất các bước test.
   });
 
-  // Giải thích từng dòng: Test case bên dưới được chú thích chi tiết theo từng bước Arrange - Act - Assert.
-  // Giải thích: Khai báo test case, Test Case ID phải khớp với ID trong file Excel.
   it('TC_CATEGORY_DELETE_02: Xoa ID khong hop le', async () => {
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const response = await deleteCategory(makeRequest('http://localhost/api/categories/invalid') as any, params('invalid'));
-    // Giải thích: Assert kết quả thực tế khớp với expected output hoặc trạng thái DB mong muốn.
     expect(response.status).toBe(400);
-  // Giải thích: Đóng block code hiện tại sau khi hoàn tất các bước test.
   });
 
-  // Giải thích từng dòng: Test case bên dưới được chú thích chi tiết theo từng bước Arrange - Act - Assert.
-  // Giải thích: Khai báo test case, Test Case ID phải khớp với ID trong file Excel.
   it('TC_CATEGORY_DELETE_03: Xoa Danh muc khong ton tai', async () => {
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const db = createCategoryMockDb();
-    // Giải thích: Dòng này là một bước setup, action hoặc assert phục vụ testcase hiện tại.
     wireCategoryPrismaToDb(db);
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const response = await deleteCategory(makeRequest('http://localhost/api/categories/99') as any, params('99'));
-    // Giải thích: Assert kết quả thực tế khớp với expected output hoặc trạng thái DB mong muốn.
     expect(response.status).toBe(404);
-  // Giải thích: Đóng block code hiện tại sau khi hoàn tất các bước test.
   });
 
-  // Giải thích từng dòng: Test case bên dưới được chú thích chi tiết theo từng bước Arrange - Act - Assert.
-  // Giải thích: Khai báo test case, Test Case ID phải khớp với ID trong file Excel.
   it('TC_CATEGORY_ALL_02: Error handling', async () => {
-    // Giải thích: Dòng này là một bước setup, action hoặc assert phục vụ testcase hiện tại.
     (prisma.category.findMany as jest.Mock).mockRejectedValue(new Error('DB Error'));
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const response = await getAllCategories();
-    // Giải thích: Assert kết quả thực tế khớp với expected output hoặc trạng thái DB mong muốn.
     expect(response.status).toBe(500);
-  // Giải thích: Đóng block code hiện tại sau khi hoàn tất các bước test.
   });
 
 
-  // Giải thích từng dòng: Test case bên dưới được chú thích chi tiết theo từng bước Arrange - Act - Assert.
-  // Giải thích: Khai báo test case, Test Case ID phải khớp với ID trong file Excel.
   it('TC_CATEGORY_POST_03: DB Error', async () => {
-    // Giải thích: Dòng này là một bước setup, action hoặc assert phục vụ testcase hiện tại.
     (prisma.category.create as jest.Mock).mockRejectedValue(new Error('DB error'));
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const response = await createCategory(makeRequest('http://localhost/api/categories', { name: 'Name' }) as any);
-    // Giải thích: Assert kết quả thực tế khớp với expected output hoặc trạng thái DB mong muốn.
     expect(response.status).toBe(500);
-  // Giải thích: Đóng block code hiện tại sau khi hoàn tất các bước test.
   });
 
-  // Giải thích từng dòng: Test case bên dưới được chú thích chi tiết theo từng bước Arrange - Act - Assert.
-  // Giải thích: Khai báo test case, Test Case ID phải khớp với ID trong file Excel.
   it('TC_CATEGORY_PUT_04: Cap nhat full truong', async () => {
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const db = createCategoryMockDb();
-    // Giải thích: Dòng này là một bước setup, action hoặc assert phục vụ testcase hiện tại.
     wireCategoryPrismaToDb(db);
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
+    const before = cloneCategoryDb(db);
     const response = await updateCategory(makeRequest('http://localhost/api/categories/1', {
-      // Giải thích: Dòng này là một bước setup, action hoặc assert phục vụ testcase hiện tại.
       name: 'Full Name',
-      // Giải thích: Dòng này là một bước setup, action hoặc assert phục vụ testcase hiện tại.
       description: 'New Desc',
-      // Giải thích: Dòng này là một bước setup, action hoặc assert phục vụ testcase hiện tại.
       isDeleted: true
-    // Giải thích: Đóng block code hiện tại sau khi hoàn tất các bước test.
     }) as any, params('1'));
-    // Giải thích: Assert kết quả thực tế khớp với expected output hoặc trạng thái DB mong muốn.
     expect(response.status).toBe(200);
-  // Giải thích: Đóng block code hiện tại sau khi hoàn tất các bước test.
+    expectCategoryRollbackMatchesBefore('TC_CATEGORY_PUT_04', db, before);
   });
 
-  // Giải thích từng dòng: Test case bên dưới được chú thích chi tiết theo từng bước Arrange - Act - Assert.
-  // Giải thích: Khai báo test case, Test Case ID phải khớp với ID trong file Excel.
   it('TC_CATEGORY_PUT_05: Cap nhat xoa truong (null)', async () => {
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const db = createCategoryMockDb();
-    // Giải thích: Dòng này là một bước setup, action hoặc assert phục vụ testcase hiện tại.
     wireCategoryPrismaToDb(db);
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
+    const before = cloneCategoryDb(db);
     const response = await updateCategory(makeRequest('http://localhost/api/categories/1', {
-      // Giải thích: Dòng này là một bước setup, action hoặc assert phục vụ testcase hiện tại.
       name: 'Full Name',
-      // Giải thích: Dòng này là một bước setup, action hoặc assert phục vụ testcase hiện tại.
       description: '',
-      // Giải thích: Dòng này là một bước setup, action hoặc assert phục vụ testcase hiện tại.
       isDeleted: false
-    // Giải thích: Đóng block code hiện tại sau khi hoàn tất các bước test.
     }) as any, params('1'));
-    // Giải thích: Assert kết quả thực tế khớp với expected output hoặc trạng thái DB mong muốn.
     expect(response.status).toBe(200);
-  // Giải thích: Đóng block code hiện tại sau khi hoàn tất các bước test.
+    expectCategoryRollbackMatchesBefore('TC_CATEGORY_PUT_05', db, before);
   });
 
 
-  // Giải thích từng dòng: Test case bên dưới được chú thích chi tiết theo từng bước Arrange - Act - Assert.
-  // Giải thích: Khai báo test case, Test Case ID phải khớp với ID trong file Excel.
   it('TC_CATEGORY_LIST_04: DB Error trong GET list', async () => {
-    // Giải thích: Dòng này là một bước setup, action hoặc assert phục vụ testcase hiện tại.
     (prisma.category.findMany as jest.Mock).mockRejectedValueOnce(new Error('DB error'));
-    // Giải thích: Khai báo biến dùng để lưu dữ liệu mock, request, response hoặc output của bước test này.
     const response = await getCategories(makeRequest('http://localhost/api/categories') as any);
-    // Giải thích: Assert kết quả thực tế khớp với expected output hoặc trạng thái DB mong muốn.
     expect(response.status).toBe(500);
-  // Giải thích: Đóng block code hiện tại sau khi hoàn tất các bước test.
   });
 });
